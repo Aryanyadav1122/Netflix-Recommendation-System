@@ -38,27 +38,79 @@ def show_recommendation_reason(
 ):
 
     shared_genres = set(
-        selected_data["listed_in"].split()
+        str(selected_data["listed_in"]).split(",")
     ).intersection(
-        set(movie["listed_in"].split())
+        set(str(movie["listed_in"]).split(","))
     )
 
     shared_cast = set(
-        selected_data["cast"].split()
+        str(selected_data["cast"]).split(",")
     ).intersection(
-        set(movie["cast"].split())
+        set(str(movie["cast"]).split(","))
     )
 
-    st.info(
-        f"""
-        Recommended because of:
-
-        • Shared Genres:
-        {", ".join(list(shared_genres)[:3])}
-
-        • Shared Cast:
-        {", ".join(list(shared_cast)[:3])}
+    st.markdown(
         """
+        <div style="margin-top:10px; margin-bottom:15px;">
+        """,
+        unsafe_allow_html=True
+    )
+
+    if shared_genres:
+
+        for genre in list(shared_genres)[:3]:
+
+            st.markdown(
+                f"""
+                <span style="
+                    background-color:#E50914;
+                    padding:6px 12px;
+                    border-radius:20px;
+                    margin-right:8px;
+                    color:white;
+                    font-size:14px;
+                ">
+                🎭 {genre.strip()}
+                </span>
+                """,
+                unsafe_allow_html=True
+            )
+
+    if shared_cast:
+
+        for actor in list(shared_cast)[:3]:
+
+            st.markdown(
+                f"""
+                <span style="
+                    background-color:#333;
+                    padding:6px 12px;
+                    border-radius:20px;
+                    margin-right:8px;
+                    color:white;
+                    font-size:14px;
+                ">
+                🎬 {actor.strip()}
+                </span>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.markdown(
+        """
+        <span style="
+            background-color:#444;
+            padding:6px 12px;
+            border-radius:20px;
+            margin-right:8px;
+            color:white;
+            font-size:14px;
+        ">
+        🤖 NLP Match
+        </span>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
 

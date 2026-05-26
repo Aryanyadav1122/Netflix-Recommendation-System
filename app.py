@@ -6,7 +6,13 @@ import re
 import time
 import pandas as pd
 import streamlit as st
+
 from src.config import *
+from src.tmdb_api import (
+    fetch_movie_data,
+    fetch_trending_movies
+)
+
 from src.preprocessing import (
     handle_missing_values,
     preprocess_text
@@ -28,8 +34,6 @@ from src.utils import (
     show_recommendation_reason,
     show_footer
 )
-
-
 
 
 # ============================================
@@ -54,6 +58,34 @@ st.markdown(
     .stApp {
         background-color: #141414;
         color: white;
+    }
+    /* Recommendation Card Styling */
+
+    .recommend-card {
+        background-color: #1f1f1f;
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 25px;
+        border: 1px solid #333;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.4);
+        transition: 0.3s;
+    }
+
+    .recommend-card:hover {
+        transform: scale(1.01);
+        border: 1px solid #E50914;
+    }
+
+    .match-score {
+        color: #00ff95;
+        font-weight: bold;
+        font-size: 18px;
+    }
+
+    .movie-title {
+        color: #E50914;
+        font-size: 28px;
+        font-weight: bold;
     }
 
     h1, h2, h3 {
@@ -90,6 +122,7 @@ content_type = st.sidebar.selectbox(
     "Choose Content Type",
     ["All", "Movie", "TV Show"]
 )
+
 num_recommendations = st.sidebar.slider(
     "Number of Recommendations",
     min_value=1,
@@ -108,9 +141,11 @@ def load_data():
 
 
 df = load_data()
+
 df = handle_missing_values(df)
 
 df = preprocess_text(df)
+
 features = create_features(df)
 
 cosine_sim, count_sim = compute_similarity(
@@ -122,6 +157,7 @@ indices = pd.Series(
     index=df["title"]
 ).drop_duplicates()
 
+
 # ============================================
 # Module 7: Dataset Filtering
 # ============================================
@@ -130,15 +166,6 @@ if content_type != "All":
     filtered_df = df[df["type"] == content_type]
 else:
     filtered_df = df
-
-
-
-
-
-
-
-
-
 
 
 # ============================================
@@ -151,8 +178,6 @@ indices = pd.Series(
 ).drop_duplicates()
 
 
-
-
 # ============================================
 # Module 13: Main Dashboard UI
 # ============================================
@@ -162,21 +187,50 @@ st.title("🎬 Netflix Recommendation System")
 st.markdown(
     APP_DESCRIPTION
 )
+
 st.info(
     """
     🔥 Features Included:
-    
+
     • Hybrid Recommendation Engine
-    
+
     • TF-IDF + CountVectorizer NLP
-    
+
     • Interactive Analytics Dashboard
-    
+
     • Explainable AI Recommendations
-    
+
     • Genre-Aware Ranking Optimization
     """
 )
+
+
+# ============================================
+# Module 30: Trending Movies Dashboard
+# ============================================
+
+st.subheader("🔥 Trending Movies This Week")
+
+trending_movies = fetch_trending_movies()
+
+trend_cols = st.columns(5)
+
+for idx, movie in enumerate(trending_movies[:5]):
+
+    with trend_cols[idx]:
+
+        poster_path = movie.get("poster_path")
+
+        if poster_path:
+
+            poster_url = (
+                "https://image.tmdb.org/t/p/w500"
+                + poster_path
+            )
+
+            st.image(poster_url)
+
+        st.caption(movie["title"])
 
 
 show_dashboard_metrics(df)
@@ -185,23 +239,27 @@ show_content_distribution(filtered_df)
 
 show_genre_analysis(filtered_df)
 
+
 # ============================================
 # Module 17: Content Selection Interface
 # ============================================
 
-selected_movie = st.selectbox(
-    "🔍 Search and Select a Movie or TV Show",
-    sorted(filtered_df["title"].unique())
+movie_titles = sorted(
+    filtered_df["title"].dropna().unique()
 )
 
-
+selected_movie = st.selectbox(
+    "🔍 Search Movie or TV Show",
+    movie_titles
+)
 # ============================================
 # Module 18: Recommendation Generation Workflow
 # ============================================
 
-if st.button("Recommend"):
+if st.button("Recommend") and selected_movie:
 
     with st.spinner("Finding best recommendations..."):
+
         st.toast(
             "Building hybrid recommendation engine..."
         )
@@ -245,79 +303,162 @@ if st.button("Recommend"):
 
                 with st.container():
 
+                    movie_data_tmdb = fetch_movie_data(
+                        movie["title"]
+                    )
+                    # Main Layout Columns
+                    poster_col, details_col = st.columns([1, 2])
+
+                    # ============================================
+                    # Left Section: Movie Poster
+                    # ============================================
+
+                    with poster_col:
+
+                        if movie_data_tmdb and movie_data_tmdb.get("poster"):
+
+                            st.image(
+                                movie_data_tmdb["poster"],
+                                width=250
+                            )
+
+                        else:
+
+                            st.image(
+                                "https://via.placeholder.com/250x375?text=No+Image",
+                                width=250
+                            )
+
+                    # ============================================
+                    # Right Section: Movie Details
+                    # ============================================
+
+                    with details_col:
+
+                        st.markdown(
+                            f"## 🎬 {movie['title']}"
+                        )
+
+                        if movie_data_tmdb:
+
+                            rating = movie_data_tmdb["rating"]
+
+                            stars = "⭐" * int(rating // 2)
+
+                            st.markdown(
+                                f"""
+                                <div class="match-score">
+                                    {stars} {rating}/10
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+
+                            st.write(
+                                "🔥 Popularity:",
+                                round(
+                                    movie_data_tmdb["popularity"],
+                                    2
+                                )
+                            )
+
+                            st.write(
+                                "📅 TMDB Release Date:",
+                                movie_data_tmdb["release_date"]
+                            )
+
+                        st.progress(
+                            min(movie["match_score"] / 100, 1.0)
+                        )
+
+                        match_score = movie["match_score"]
+
+                        if match_score >= 80:
+                            confidence = "Excellent Match"
+
+                        elif match_score >= 60:
+                            confidence = "Very Good Match"
+
+                        elif match_score >= 40:
+                            confidence = "Good Match"
+
+                        else:
+                            confidence = "Average Match"
+
+                        st.markdown(
+                            f"""
+                            <div class="match-score">
+                                🎯 {confidence} — {match_score}%
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                        info_col1, info_col2 = st.columns(2)
+
+                        with info_col1:
+
+                            st.write(
+                                "📺 Type:",
+                                movie["type"]
+                            )
+
+                            st.write(
+                                "📅 Release Year:",
+                                movie["release_year"]
+                            )
+
+                            st.write(
+                                "🌍 Country:",
+                                movie["country"]
+                            )
+
+                        with info_col2:
+
+                            st.write(
+                                "🎭 Genre:",
+                                movie["listed_in"]
+                            )
+
+                            st.write(
+                                "⭐ Rating:",
+                                movie["rating"]
+                            )
+
+                            st.write(
+                                "🎬 Director:",
+                                movie["director"]
+                            )
+
+                        st.write(
+                            "🧑 Cast:",
+                            movie["cast"]
+                        )
+
+                        st.caption(
+                            "Content similarity generated using hybrid NLP embeddings"
+                        )
+
+                        selected_data = df[
+                            df["title"] == selected_movie
+                        ].iloc[0]
+
+                        show_recommendation_reason(
+                            selected_data,
+                            movie
+                        )
+
+                        with st.expander(
+                            "📝 Show Description"
+                        ):
+
+                            st.write(
+                                movie["description"]
+                            )
                     st.markdown(
-                        f"## 🎬 {movie['title']}"
+                        '<div class="recommend-card">',
+                        unsafe_allow_html=True
                     )
-
-                    st.progress(
-                        min(movie["match_score"] / 100, 1.0)
-                    )
-
-                    st.success(
-                        f"🎯 Match Confidence: {movie['match_score']}%"
-                    )
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.write("📺 Type:", movie["type"])
-                        st.write(
-                            "📅 Release Year:",
-                            movie["release_year"]
-                        )
-                        st.write(
-                            "🌍 Country:",
-                            movie["country"]
-                        )
-
-                    with col2:
-                        st.write(
-                            "🎭 Genre:",
-                            movie["listed_in"]
-                        )
-                        st.write(
-                            "⭐ Rating:",
-                            movie["rating"]
-                        )
-                        st.write(
-                            "🎬 Director:",
-                            movie["director"]
-                        )
-
-                    st.write("🧑 Cast:", movie["cast"])
-                    st.caption(
-                        "Content similarity generated using hybrid NLP embeddings"
-                    )
-                    selected_data = df[
-                        df["title"] == selected_movie
-                    ].iloc[0]
-
-                    shared_genres = set(
-                        selected_data["listed_in"].split()
-                    ).intersection(
-                        set(movie["listed_in"].split())
-                    )                   
-
-                    shared_cast = set(
-                        selected_data["cast"].split()
-                    ).intersection(
-                        set(movie["cast"].split())
-                    )
-
-                    st.info(
-                        f"""
-                        Recommended because of:
-    
-                        • Shared Genres: {", ".join(list(shared_genres)[:3])}
-    
-                        • Shared Cast: {", ".join(list(shared_cast)[:3])}
-                        """
-                    )
-
-                    with st.expander(
-                        "📝 Show Description"
-                    ):
-                        st.write(movie["description"])
-
                     st.markdown("---")
 
 
