@@ -6,6 +6,8 @@ import re
 import time
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from src.config import *
 from src.tmdb_api import (
@@ -26,7 +28,10 @@ from src.recommender import (
 
 from src.visualization import (
     show_content_distribution,
-    show_genre_analysis
+    show_genre_analysis,
+    show_rating_distribution,
+    show_correlation_heatmap,
+    show_popularity_vs_rating
 )
 
 from src.utils import (
@@ -137,7 +142,7 @@ num_recommendations = st.sidebar.slider(
 
 @st.cache_data
 def load_data():
-    return pd.read_csv("data/netflix_titles.csv")
+    return pd.read_csv("data/tmdb_content_v2.csv")
 
 
 df = load_data()
@@ -238,6 +243,12 @@ show_dashboard_metrics(df)
 show_content_distribution(filtered_df)
 
 show_genre_analysis(filtered_df)
+
+show_rating_distribution(filtered_df)
+
+show_correlation_heatmap(filtered_df)
+
+show_popularity_vs_rating(filtered_df)
 
 
 # ============================================
